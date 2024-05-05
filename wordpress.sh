@@ -71,12 +71,35 @@ server {
 EOF
 
 ln -s /etc/nginx/sites-available/wordpress /etc/nginx/sites-enabled/
+rm /etc/nginx/sites-enabled/default
 
 # 下载并安装WordPress
 wget https://cn.wordpress.org/latest-zh_CN.tar.gz
 tar zxvf latest-zh_CN.tar.gz -C /var/www/html
 chown -R www-data:www-data /var/www/html/wordpress
 chmod -R 755 /var/www/html/wordpress
+
+# 配置WordPress
+cat > /var/www/html/wordpress/wp-config.php <<EOF
+<?php
+define( 'DB_NAME', 'wordpress' );
+define( 'DB_USER', '$db_username' );
+define( 'DB_PASSWORD', '$db_password' );
+define( 'DB_HOST', 'localhost' );
+define( 'DB_CHARSET', 'utf8' );
+define( 'DB_COLLATE', '' );
+
+define( 'WP_SITEURL', 'http://\$_SERVER[HTTP_HOST]:8080' );
+define( 'WP_HOME', 'http://\$_SERVER[HTTP_HOST]:8080' );
+
+\$table_prefix = 'wp_';
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+require_once ABSPATH . 'wp-settings.php';
+EOF
 
 # 优化PHP上传限制
 sed -i 's/post_max_size = .*/post_max_size = 50M/' /etc/php/7.4/fpm/php.ini
