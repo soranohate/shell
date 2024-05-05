@@ -56,7 +56,6 @@ else
   # 如果用户没有输入密码,则生成随机密码
   if [ -z "$password" ]; then
     db_password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
-    echo "自动生成的随机密码为: $db_password"
   else
     db_password="$password"
   fi
@@ -106,9 +105,6 @@ mv wordpress /var/www/html/
 
 # 修改wordpress目录权限
 chmod -R 777 /var/www/html/wordpress
-
-# 移动index.html
-mv /var/www/html/index.html /var/www/html/wordpress/index~.html
 
 # 重启php7.4-fpm
 systemctl restart php7.4-fpm
