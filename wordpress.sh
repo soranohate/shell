@@ -42,24 +42,53 @@ EOF
 # 进入MySQL终端
 mysql -u root <<EOF
 
-# 设置root密码
-SET PASSWORD FOR 'root'@'localhost' = PASSWORD('soranohate');
-
-# 创建WordPress数据库
-CREATE DATABASE wordpress;
-
 # 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
 read -p "请输入要创建的MySQL用户名 (默认为shipzy): " username
 username=\${username:-shipzy}
-read -s -p "请输入 \$username 的密码 (默认为soranohate): " password
-password=\${password:-soranohate}
+read -s -p "请输入 \$username 的密码 (留空则自动生成随机密码): " password
 echo
 
-# 创建MySQL用户
-CREATE USER '\$username'@'localhost' IDENTIFIED BY '\$password';
-
-# 关联数据库和用户
-GRANT ALL PRIVILEGES ON wordpress.* TO '\$username'@'localhost';
+# 如果用户直接回车,则使用预设的默认值
+if [ -z "\$username" ]; then
+  root_password="soranohate"
+  db_username="shipzy"
+  db_password="soranohate"
+  
+  # 设置root密码
+  SET PASSWORD FOR 'root'@'localhost' = PASSWORD('\$root_password');
+  
+  # 创建WordPress数据库
+  CREATE DATABASE wordpress;
+  
+  # 创建MySQL用户
+  CREATE USER '\$db_username'@'localhost' IDENTIFIED BY '\$db_password';
+  
+  # 关联数据库和用户
+  GRANT ALL PRIVILEGES ON wordpress.* TO '\$db_username'@'localhost';
+else
+  # 如果用户没有输入密码,则生成随机密码
+  if [ -z "\$password" ]; then
+    db_password=\$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
+    echo "自动生成的随机密码为: \$db_password"
+  else
+    db_password="\$password"
+  fi
+  
+  root_password="\$db_password"
+  db_username="\$username"
+  
+  # 设置root密码
+  SET PASSWORD FOR 'root'@'localhost' = PASSWORD('\$root_password');
+  
+  # 创建WordPress数据库
+  CREATE DATABASE wordpress;
+  
+  # 创建MySQL用户
+  CREATE USER '\$db_username'@'localhost' IDENTIFIED BY '\$db_password';
+  
+  # 关联数据库和用户
+  GRANT ALL PRIVILEGES ON wordpress.* TO '\$db_username'@'localhost';
+fi
 
 # 刷新权限
 FLUSH PRIVILEGES;
@@ -100,5 +129,11 @@ systemctl restart mariadb
 
 # 重启apache2
 systemctl restart apache2
+
+echo "===== 账号密码信息 ====="
+echo "MySQL root 密码: $root_password"
+echo "WordPress 数据库名: wordpress"
+echo "WordPress 数据库用户名: $db_username"
+echo "WordPress 数据库密码: $db_password"
 
 echo "WordPress安装完成,请访问 http://服务器公网IP地址 开始安装"
