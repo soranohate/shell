@@ -21,8 +21,8 @@ y
 EOF
 
 # 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
-read -p "请输入要创建的MySQL用户名 (默认为wordpress): " db_username
-db_username=${db_username:-wordpress}
+read -p "请输入要创建的MySQL用户名 (默认为shipyz): " db_username
+db_username=${db_username:-shipyz}
 read -s -p "请输入 $db_username 的密码 (留空则自动生成随机密码): " db_password
 echo
 
@@ -53,8 +53,8 @@ apt install -y php7.4-fpm php7.4-mysql php7.4-curl php7.4-gd php7.4-intl php7.4-
 # 配置Nginx
 cat > /etc/nginx/sites-available/wordpress <<EOF
 server {
-    listen 80;
-    listen [::]:80;
+    listen 8080;
+    listen [::]:8080;
     server_name _;
     root /var/www/html/wordpress;
     index index.php;
@@ -104,4 +104,4 @@ echo "WordPress 数据库名: wordpress"
 echo "WordPress 数据库用户名: $db_username"
 echo "WordPress 数据库密码: $db_password"
 
-echo "WordPress安装完成,请访问 http://服务器IP地址 开始安装"
+echo "WordPress安装完成,请访问 http://服务器IP地址:8080 开始安装"
