@@ -29,30 +29,44 @@ systemctl restart apache2
 apt install mariadb-server mariadb-client -y
 
 # 运行MySQL安全脚本 
-mysql_secure_installation
+mysql_secure_installation <<EOF
+
+n
+n
+y
+y
+y
+y
+EOF
 
 # 进入MySQL终端
-mysql -u root -p
+mysql -u root <<EOF
 
-# 提示用户输入要创建的数据库名称
-read -p "请输入要创建的WordPress数据库名称: " dbname
-# 创建wordpress数据库
-CREATE DATABASE $dbname;
+# 设置root密码
+SET PASSWORD FOR 'root'@'localhost' = PASSWORD('soranohate');
 
-# 提示用户输入要创建的MySQL用户名和密码
-read -p "请输入要创建的MySQL用户名: " username  
-read -p "请输入 $username 的密码: " password
+# 创建WordPress数据库
+CREATE DATABASE wordpress;
+
+# 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
+read -p "请输入要创建的MySQL用户名 (默认为shipzy): " username
+username=\${username:-shipzy}
+read -s -p "请输入 \$username 的密码 (默认为soranohate): " password
+password=\${password:-soranohate}
+echo
+
 # 创建MySQL用户
-CREATE USER '$username'@'localhost' IDENTIFIED BY '$password';  
+CREATE USER '\$username'@'localhost' IDENTIFIED BY '\$password';
 
 # 关联数据库和用户
-GRANT ALL PRIVILEGES ON $dbname.* TO '$username'@'localhost';
+GRANT ALL PRIVILEGES ON wordpress.* TO '\$username'@'localhost';
 
-# 刷新权限 
+# 刷新权限
 FLUSH PRIVILEGES;
 
 # 退出MySQL
 exit
+EOF
 
 # 删除wordpress空文件夹
 rm -rf /var/www/html/wordpress
@@ -66,10 +80,10 @@ wget https://cn.wordpress.org/latest-zh_CN.zip
 # 安装unzip
 apt install unzip -y
 
-# 解压wordpress压缩包 
+# 解压wordpress压缩包
 unzip latest-zh_CN.zip
 
-# 移动wordpress文件夹到网站根目录
+# 移动wordpress文件夹到网站根目录 
 mv wordpress /var/www/html/
 
 # 修改wordpress目录权限
