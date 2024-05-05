@@ -7,67 +7,76 @@ read -p "请输入你的域名: " domain
 # 安装 acme.sh
 curl https://get.acme.sh | sh -s email=$email
 
-# 生成证书
+# 申请证书
 ~/.acme.sh/acme.sh --issue -d $domain --nginx
-
-# 创建证书目录
-mkdir -p /etc/nginx/cert
 
 # 安装证书
 ~/.acme.sh/acme.sh --install-cert -d $domain \
---key-file       /etc/nginx/cert/key.pem  \
---fullchain-file /etc/nginx/cert/cert.pem \
+--key-file       /etc/nginx/cert/$domain.key  \
+--fullchain-file /etc/nginx/cert/fullchain.cer \
 --reloadcmd     "service nginx force-reload"
 
 # 配置 Nginx
 cat > /etc/nginx/sites-available/wordpress <<EOF
 server {
-    listen 8080;
-    listen [::]:8080;
+    listen 80;
     server_name $domain;
-    return 301 https://\$server_name:8443\$request_uri;
+
+    location / {
+        return 301 https://\$server_name\$request_uri;
+    }
 }
 
 server {
-    listen 8443 ssl;
-    listen [::]:8443 ssl;
+    listen 443 ssl http2;
     server_name $domain;
 
-    ssl_certificate /etc/nginx/cert/cert.pem;
-    ssl_certificate_key /etc/nginx/cert/key.pem;
-    ssl_session_timeout 5m;
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
-    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-    ssl_prefer_server_ciphers on;
+    ssl_certificate /etc/nginx/cert/fullchain.cer;
+    ssl_certificate_key /etc/nginx/cert/$domain.key;
+    
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;  # about 40000 sessions
+    ssl_session_tickets off;
 
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    resolver 1.1.1.1 valid=300s;
+    resolver_timeout 5s;
+      
     root /var/www/html/wordpress;
     index index.php;
 
-    location = /favicon.ico {
-        log_not_found off;
-        access_log off;
-    }
-
-    location = /robots.txt {
-        allow all;
-        log_not_found off;
-        access_log off;
-    }
-
     location / {
-        try_files \$uri \$uri/ /index.php?\$args;
+        try_files \$uri \$uri/ /index.php\$is_args\$args;
     }
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
     }
 
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|swf|webp|pdf|txt|doc|docx|xls|xlsx|ppt|pptx|mov|fla|zip|rar)$ {
+    location ~ /\.ht {
+        deny all;
+    }
+      
+    location = /favicon.ico { 
+        log_not_found off; access_log off; 
+    }
+    location = /robots.txt { 
+        log_not_found off; access_log off; allow all; 
+    }
+    location ~* \.(css|gif|ico|jpeg|jpg|js|png)$ {
         expires max;
-        access_log off;
         log_not_found off;
-        try_files \$uri =404;
     }
 }
 EOF
@@ -78,4 +87,6 @@ rm /etc/nginx/sites-enabled/default
 # 重启 Nginx
 systemctl restart nginx
 
-echo "HTTPS 设置完成。你的 WordPress 网站现在可以通过 https://$domain:8443 访问。"
+echo "HTTPS 设置完成。你的 WordPress 网站现在可以通过 https://$domain 访问。"
+echo "请检查 WordPress 的设置,确保 WordPress 地址和站点地址都设置为 https://$domain。"
+echo "如果遇到样式丢失等问题,请检查 WordPress 的资源链接是否使用了相对路径。"
