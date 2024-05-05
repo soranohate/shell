@@ -9,6 +9,9 @@ apt install nginx -y
 # 安装MariaDB
 apt install mariadb-server -y
 
+# 安装wget
+apt install wget -y
+
 # 运行MySQL安全脚本 
 mysql_secure_installation <<EOF
 
@@ -75,29 +78,10 @@ rm /etc/nginx/sites-enabled/default
 
 # 下载并安装WordPress
 wget https://cn.wordpress.org/latest-zh_CN.tar.gz
-tar zxvf latest-zh_CN.tar.gz
-mv wordpress /var/www/html/
+tar zxvf latest-zh_CN.tar.gz -C /var/www/html/
+cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
 chown -R www-data:www-data /var/www/html/wordpress
 chmod -R 755 /var/www/html/wordpress
-
-# 配置WordPress
-cat > /var/www/html/wordpress/wp-config.php <<EOF
-<?php
-define( 'DB_NAME', 'wordpress' );
-define( 'DB_USER', '$db_username' );
-define( 'DB_PASSWORD', '$db_password' );
-define( 'DB_HOST', 'localhost' );
-define( 'DB_CHARSET', 'utf8' );
-define( 'DB_COLLATE', '' );
-
-\$table_prefix = 'wp_';
-
-if ( ! defined( 'ABSPATH' ) ) {
-    define( 'ABSPATH', __DIR__ . '/' );
-}
-
-require_once ABSPATH . 'wp-settings.php';
-EOF
 
 # 优化PHP上传限制
 sed -i 's/post_max_size = .*/post_max_size = 50M/' /etc/php/7.4/fpm/php.ini
@@ -126,3 +110,9 @@ echo "WordPress 数据库用户名: $db_username"
 echo "WordPress 数据库密码: $db_password"
 
 echo "WordPress安装完成,请访问 http://服务器IP地址:8080 开始安装"
+echo "请注意,你可能需要手动编辑 WordPress 的配置文件来设置正确的数据库信息。"
+echo "配置文件路径: /var/www/html/wordpress/wp-config.php"
+echo "请在文件中找到以下行并填入正确的值:"
+echo "define( 'DB_NAME', 'wordpress' );"
+echo "define( 'DB_USER', '$db_username' );"
+echo "define( 'DB_PASSWORD', '$db_password' );"
