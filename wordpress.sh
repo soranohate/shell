@@ -75,7 +75,8 @@ rm /etc/nginx/sites-enabled/default
 
 # 下载并安装WordPress
 wget https://cn.wordpress.org/latest-zh_CN.tar.gz
-tar zxvf latest-zh_CN.tar.gz -C /var/www/html
+tar zxvf latest-zh_CN.tar.gz
+mv wordpress /var/www/html/
 chown -R www-data:www-data /var/www/html/wordpress
 chmod -R 755 /var/www/html/wordpress
 
@@ -89,13 +90,10 @@ define( 'DB_HOST', 'localhost' );
 define( 'DB_CHARSET', 'utf8' );
 define( 'DB_COLLATE', '' );
 
-define( 'WP_SITEURL', 'http://\$_SERVER[HTTP_HOST]:8080' );
-define( 'WP_HOME', 'http://\$_SERVER[HTTP_HOST]:8080' );
-
 \$table_prefix = 'wp_';
 
 if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', __DIR__ . '/' );
+    define( 'ABSPATH', __DIR__ . '/' );
 }
 
 require_once ABSPATH . 'wp-settings.php';
