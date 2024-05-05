@@ -12,19 +12,6 @@ apt install apache2 -y
 # 启用Apache2 rewrite模块
 a2enmod rewrite
 
-# 修改Apache根目录权限
-chmod -R 777 /var/www/html
-
-# 创建wordpress文件夹
-mkdir /var/www/html/wordpress
-
-# 修改Apache默认配置文件
-sed -i 's/\/var\/www\//\/var\/www\/html\/wordpress/g' /etc/apache2/sites-available/000-default.conf
-sed -i 's/<Directory \/var\/www\//<Directory \/var\/www\/html\/wordpress/g' /etc/apache2/apache2.conf
-
-# 重启Apache服务 
-systemctl restart apache2
-
 # 安装MySQL
 apt install mariadb-server mariadb-client -y
 
@@ -40,15 +27,15 @@ y
 EOF
 
 # 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
-read -p "请输入要创建的MySQL用户名 (默认为shipzy): " username
-username=${username:-shipzy}
+read -p "请输入要创建的MySQL用户名 (默认为wpuser): " username
+username=${username:-wpuser}
 read -s -p "请输入 $username 的密码 (留空则自动生成随机密码): " password
 echo
 
 # 如果用户直接回车,则使用预设的默认值
 if [ -z "$username" ]; then
   root_password="soranohate"
-  db_username="shipzy"
+  db_username="wpuser"
   db_password="soranohate"
 else
   db_username="$username"
@@ -85,9 +72,6 @@ FLUSH PRIVILEGES;
 exit
 EOF
 
-# 删除wordpress空文件夹
-rm -rf /var/www/html/wordpress
-
 # 安装wget
 apt install wget -y
 
@@ -104,7 +88,8 @@ unzip latest-zh_CN.zip
 mv wordpress /var/www/html/
 
 # 修改wordpress目录权限
-chmod -R 777 /var/www/html/wordpress
+chown -R www-data:www-data /var/www/html/wordpress
+chmod -R 755 /var/www/html/wordpress
 
 # 重启php7.4-fpm
 systemctl restart php7.4-fpm
