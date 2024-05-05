@@ -24,8 +24,8 @@ y
 EOF
 
 # 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
-read -p "请输入要创建的MySQL用户名 (默认为shipyz): " db_username
-db_username=${db_username:-shipyz}
+read -p "请输入要创建的MySQL用户名 (默认为wordpress): " db_username
+db_username=${db_username:-wordpress}
 read -s -p "请输入 $db_username 的密码 (留空则自动生成随机密码): " db_password
 echo
 
