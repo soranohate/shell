@@ -39,56 +39,45 @@ y
 y
 EOF
 
-# 进入MySQL终端
-mysql -u root <<EOF
-
 # 提示用户输入要创建的MySQL用户名和密码,如果直接回车则使用默认值
 read -p "请输入要创建的MySQL用户名 (默认为shipzy): " username
-username=\${username:-shipzy}
-read -s -p "请输入 \$username 的密码 (留空则自动生成随机密码): " password
+username=${username:-shipzy}
+read -s -p "请输入 $username 的密码 (留空则自动生成随机密码): " password
 echo
 
 # 如果用户直接回车,则使用预设的默认值
-if [ -z "\$username" ]; then
+if [ -z "$username" ]; then
   root_password="soranohate"
   db_username="shipzy"
   db_password="soranohate"
-  
-  # 设置root密码
-  SET PASSWORD FOR 'root'@'localhost' = PASSWORD('\$root_password');
-  
-  # 创建WordPress数据库
-  CREATE DATABASE wordpress;
-  
-  # 创建MySQL用户
-  CREATE USER '\$db_username'@'localhost' IDENTIFIED BY '\$db_password';
-  
-  # 关联数据库和用户
-  GRANT ALL PRIVILEGES ON wordpress.* TO '\$db_username'@'localhost';
 else
+  db_username="$username"
+  
   # 如果用户没有输入密码,则生成随机密码
-  if [ -z "\$password" ]; then
-    db_password=\$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
-    echo "自动生成的随机密码为: \$db_password"
+  if [ -z "$password" ]; then
+    db_password=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
+    echo "自动生成的随机密码为: $db_password"
   else
-    db_password="\$password"
+    db_password="$password"
   fi
   
-  root_password="\$db_password"
-  db_username="\$username"
-  
-  # 设置root密码
-  SET PASSWORD FOR 'root'@'localhost' = PASSWORD('\$root_password');
-  
-  # 创建WordPress数据库
-  CREATE DATABASE wordpress;
-  
-  # 创建MySQL用户
-  CREATE USER '\$db_username'@'localhost' IDENTIFIED BY '\$db_password';
-  
-  # 关联数据库和用户
-  GRANT ALL PRIVILEGES ON wordpress.* TO '\$db_username'@'localhost';
+  root_password="$db_password"
 fi
+
+# 进入MySQL终端
+mysql -u root <<EOF
+
+# 设置root密码
+SET PASSWORD FOR 'root'@'localhost' = PASSWORD('$root_password');
+  
+# 创建WordPress数据库
+CREATE DATABASE wordpress;
+  
+# 创建MySQL用户
+CREATE USER '$db_username'@'localhost' IDENTIFIED BY '$db_password';
+  
+# 关联数据库和用户
+GRANT ALL PRIVILEGES ON wordpress.* TO '$db_username'@'localhost';
 
 # 刷新权限
 FLUSH PRIVILEGES;
