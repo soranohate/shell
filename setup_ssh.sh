@@ -52,61 +52,39 @@ fi
 cp "$CONFIG_FILE" "$BACKUP_FILE" || { echo "备份 $CONFIG_FILE 失败"; exit 1; }
 echo "配置文件已备份到 $BACKUP_FILE"
 
-# 7. 定义函数以设置配置文件选项
-set_option() {
-    local option=$1
-    local value=$2
-    sed -i "/^#*[ \t]*$option[ \t=].*/s/.*/$option $value/" "$CONFIG_FILE" || echo "$option $value" >> "$CONFIG_FILE"
-}
-
-# 8. 提示用户选择自动更新或手动编辑
-echo "是否自动更新 SSH 配置文件？（推荐）"
-read -p "输入 y 自动更新，n 手动编辑: " choice
-choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
-
-# 9. 自动更新或手动编辑
-if [ "$choice" = "y" ]; then
-    echo "正在自动更新 SSH 配置文件..."
-    set_option "PubkeyAuthentication" "yes"
-    set_option "PasswordAuthentication" "no"
-    set_option "AuthorizedKeysFile" ".ssh/authorized_keys"
-    set_option "PermitRootLogin" "without-password"
-    echo "自动更新完成"
+# 7. 提示用户手动编辑 SSH 配置文件
+echo "请手动编辑 $CONFIG_FILE，确保以下配置项正确设置："
+echo "  - PubkeyAuthentication yes          # 启用密钥认证"
+echo "  - PasswordAuthentication no         # 禁用密码登录"
+echo "  - AuthorizedKeysFile .ssh/authorized_keys  # 指定密钥文件路径"
+echo "  - PermitRootLogin without-password  # 仅允许密钥登录"
+echo "按 Enter 键继续，脚本将打开编辑器..."
+read -p ""
+if command -v nano > /dev/null; then
+    nano "$CONFIG_FILE"
+elif command -v vim > /dev/null; then
+    vim "$CONFIG_FILE"
 else
-    # 手动编辑
-    echo "请手动编辑 $CONFIG_FILE，确保以下配置项正确设置："
-    echo "  - PubkeyAuthentication yes"
-    echo "  - PasswordAuthentication no"
-    echo "  - AuthorizedKeysFile .ssh/authorized_keys"
-    echo "  - PermitRootLogin without-password"
-    read -p "按 Enter 键继续，脚本将打开编辑器..."
-    if command -v nano > /dev/null; then
-        nano "$CONFIG_FILE"
-    elif command -v vim > /dev/null; then
-        vim "$CONFIG_FILE"
-    else
-        echo "未找到 nano 或 vim，请手动编辑 $CONFIG_FILE"
-        exit 1
-    fi
-    echo "手动编辑完成"
+    echo "未找到 nano 或 vim，请手动编辑 $CONFIG_FILE"
+    exit 1
 fi
+echo "手动编辑完成"
 
-# 10. 测试 SSH 配置并自动回滚
+# 8. 测试 SSH 配置
 echo "正在测试 SSH 配置文件..."
 if ! sshd -t; then
-    echo "SSH 配置有错误。正在回滚到备份文件。"
-    cp "$BACKUP_FILE" "$CONFIG_FILE" || { echo "回滚失败"; exit 1; }
-    echo "已回滚到备份文件"
+    echo "SSH 配置有错误，请检查 $CONFIG_FILE 并修正错误后重新运行脚本。"
+    echo "你可以使用备份文件 $BACKUP_FILE 恢复原始配置。"
     exit 1
 fi
 echo "SSH 配置测试通过！"
 
-# 11. 重启 SSH 服务
+# 9. 重启 SSH 服务
 echo "正在重启 SSH 服务以应用配置..."
 systemctl restart sshd
 echo "SSH 服务已重启。"
 
-# 12. 完成提示
+# 10. 完成提示
 echo "脚本执行完成！"
 echo "请使用你的私钥测试 SSH 连接，确保配置生效。"
 echo "示例命令：ssh -i <私钥文件路径> root@<服务器IP>"
