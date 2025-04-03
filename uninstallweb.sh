@@ -1,80 +1,95 @@
 #!/bin/bash
 set -e
 
-# 检查是否以root权限运行
+# 检查root权限
 if [ "$EUID" -ne 0 ]; then
     echo "请使用sudo或以root身份运行此脚本"
     exit 1
 fi
 
-# 获取要删除的域名
-read -p "请输入要删除的域名 (例如: p.zyovo.cc): " domain
+# 获取可用域名列表
+show_menu() {
+    echo "可用域名列表："
+    ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null | xargs -n1 basename | sed 's/.conf$//' | nl -s ") "
+    echo
+}
 
-# 定义相关路径
+# 参数处理
+if [ $# -eq 0 ]; then
+    show_menu
+    read -p "请输入要删除的域名编号或完整域名: " input
+    
+    # 尝试将输入解析为数字
+    if [[ $input =~ ^[0-9]+$ ]]; then
+        domains=($(ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null | xargs -n1 basename | sed 's/.conf$//'))
+        selected=$((input-1))
+        [ ${#domains[@]} -le $selected ] && { echo "无效编号"; exit 1; }
+        domain=${domains[$selected]}
+    else
+        domain=$input
+    fi
+else
+    domain=$1
+fi
+
+# 定义路径
 nginx_available="/etc/nginx/sites-available/${domain}.conf"
 nginx_enabled="/etc/nginx/sites-enabled/${domain}.conf"
-letsencrypt_live="/etc/letsencrypt/live/${domain}"
-letsencrypt_archive="/etc/letsencrypt/archive/${domain}"
-letsencrypt_renewal="/etc/letsencrypt/renewal/${domain}.conf"
 
-# 检查配置文件是否存在
+# 验证配置存在
 if [ ! -f "$nginx_available" ] && [ ! -L "$nginx_enabled" ]; then
-    echo "错误：未找到 ${domain} 的Nginx配置文件"
+    echo "错误：未找到 ${domain} 的Nginx配置"
     exit 1
 fi
 
-# 显示警告信息
-echo -e "\n即将永久删除以下内容："
+# 显示删除清单
+echo -e "\n\033[31m即将永久删除以下内容：\033[0m"
 echo "-------------------------------------"
 [ -f "$nginx_available" ] && echo "Nginx配置: $nginx_available"
-[ -L "$nginx_enabled" ] && echo "符号链接: $nginx_enabled"
-[ -d "$letsencrypt_live" ] && echo "SSL证书(Live): $letsencrypt_live"
-[ -d "$letsencrypt_archive" ] && echo "SSL证书(Archive): $letsencrypt_archive"
-[ -f "$letsencrypt_renewal" ] && echo "证书续订配置: $letsencrypt_renewal"
+[ -L "$nginx_enabled" ] && echo "启用链接: $nginx_enabled"
+
+cert_paths=(
+    "/etc/letsencrypt/live/${domain}"
+    "/etc/letsencrypt/archive/${domain}"
+    "/etc/letsencrypt/renewal/${domain}.conf"
+)
+
+for path in "${cert_paths[@]}"; do
+    [ -e "$path" ] && echo "证书相关: $path"
+done
 echo "相关日志: /var/log/letsencrypt/*"
 echo "-------------------------------------"
 
 # 二次确认
-read -p "确认要永久删除以上所有内容吗？(y/n): " confirm
-if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "操作已取消"
-    exit 0
+read -p "确认永久删除以上内容？(y/n) " -n 1 confirm
+echo
+[[ $confirm =~ [yY] ]] || { echo "操作取消"; exit 0; }
+
+# 吊销证书
+if [ -d "/etc/letsencrypt/live/${domain}" ]; then
+    echo -e "\n吊销SSL证书..."
+    certbot revoke --cert-path "/etc/letsencrypt/live/${domain}/cert.pem" \
+        --delete-after-revoke --non-interactive
 fi
 
-# 吊销证书（如果存在）
-if [ -d "$letsencrypt_live" ]; then
-    echo -e "\n正在吊销SSL证书..."
-    certbot revoke --cert-path "$letsencrypt_live/cert.pem" --delete-after-revoke --non-interactive
-fi
+# 删除操作
+echo -e "\n删除Nginx配置..."
+rm -f "$nginx_available" "$nginx_enabled"
 
-# 删除所有证书相关配置
-echo -e "\n正在清理Certbot配置..."
-[ -d "$letsencrypt_live" ] && rm -rf "$letsencrypt_live"
-[ -d "$letsencrypt_archive" ] && rm -rf "$letsencrypt_archive"
-[ -f "$letsencrypt_renewal" ] && rm -f "$letsencrypt_renewal"
+echo "清理证书文件..."
+rm -rf "/etc/letsencrypt/live/${domain}" \
+       "/etc/letsencrypt/archive/${domain}" \
+       "/etc/letsencrypt/renewal/${domain}.conf"
 
-# 删除Nginx配置
-echo -e "\n正在删除Nginx配置..."
-[ -f "$nginx_available" ] && rm -f "$nginx_available"
-[ -L "$nginx_enabled" ] && rm -f "$nginx_enabled"
-
-# 清理日志文件
-echo -e "\n正在清理日志..."
+echo "清理日志..."
 rm -rf /var/log/letsencrypt/*
 
-# 测试并重载Nginx配置
-echo -e "\n正在验证Nginx配置..."
+# 重载Nginx
+echo -e "\n检查Nginx配置..."
 if nginx -t; then
-    echo -e "\n正在重载Nginx服务..."
     systemctl reload nginx
+    echo -e "\n\033[32m[成功] ${domain} 已完全移除\033[0m"
 else
-    echo "错误：Nginx配置验证失败，请手动检查！"
+    echo -e "\n\033[31m警告：Nginx配置验证失败，请手动检查！\033[0m"
     exit 1
 fi
-
-echo -e "\n[完成] ${domain} 配置已完全清除！"
-echo "已删除内容包括："
-echo "1. Nginx配置文件"
-echo "2. SSL证书文件(Live/Archive)"
-echo "3. 证书续订配置"
-echo "4. 相关日志文件"
