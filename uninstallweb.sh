@@ -7,10 +7,14 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# 获取可用域名列表
+# 获取可用域名列表（按字母排序）
 show_menu() {
     echo "可用域名列表："
-    ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null | xargs -n1 basename | sed 's/.conf$//' | nl -s ") "
+    ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null \
+        | sort -V \
+        | xargs -n1 basename \
+        | sed 's/.conf$//' \
+        | nl -s ") " -w 3
     echo
 }
 
@@ -18,12 +22,23 @@ show_menu() {
 if [ $# -eq 0 ]; then
     show_menu
     read -p "请输入要删除的域名编号或完整域名: " input
-    
-    # 尝试将输入解析为数字
+    [ -z "$input" ] && { echo "输入不能为空"; exit 1; }
+
+    # 数字输入处理
     if [[ $input =~ ^[0-9]+$ ]]; then
-        domains=($(ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null | xargs -n1 basename | sed 's/.conf$//'))
+        mapfile -t domains < <(
+            ls -1 /etc/nginx/sites-available/*.conf 2>/dev/null \
+            | sort -V \
+            | xargs -n1 basename \
+            | sed 's/.conf$//'
+        )
         selected=$((input-1))
-        [ ${#domains[@]} -le $selected ] && { echo "无效编号"; exit 1; }
+        
+        # 验证数字范围
+        if (( selected < 0 || selected >= ${#domains[@]} )); then
+            echo "错误：无效的编号"
+            exit 1
+        fi
         domain=${domains[$selected]}
     else
         domain=$input
@@ -42,8 +57,8 @@ if [ ! -f "$nginx_available" ] && [ ! -L "$nginx_enabled" ]; then
     exit 1
 fi
 
-# 显示删除清单
-echo -e "\n\033[31m即将永久删除以下内容：\033[0m"
+# 显示删除清单（红色警告）
+echo -e "\n\033[31m[警告] 即将永久删除以下内容：\033[0m"
 echo "-------------------------------------"
 [ -f "$nginx_available" ] && echo "Nginx配置: $nginx_available"
 [ -L "$nginx_enabled" ] && echo "启用链接: $nginx_enabled"
@@ -60,8 +75,8 @@ done
 echo "相关日志: /var/log/letsencrypt/*"
 echo "-------------------------------------"
 
-# 二次确认
-read -p "确认永久删除以上内容？(y/n) " -n 1 confirm
+# 二次确认（带红色强调）
+read -p $'\033[31m确认永久删除以上内容？(y/n)\033[0m ' -n 1 confirm
 echo
 [[ $confirm =~ [yY] ]] || { echo "操作取消"; exit 0; }
 
@@ -90,6 +105,6 @@ if nginx -t; then
     systemctl reload nginx
     echo -e "\n\033[32m[成功] ${domain} 已完全移除\033[0m"
 else
-    echo -e "\n\033[31m警告：Nginx配置验证失败，请手动检查！\033[0m"
+    echo -e "\n\033[31m[错误] Nginx配置验证失败，请手动检查！\033[0m"
     exit 1
 fi
